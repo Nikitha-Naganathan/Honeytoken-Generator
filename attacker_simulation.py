@@ -20,6 +20,7 @@ SERVER_PORT = 9999
 
 LOG_DIR.mkdir(exist_ok=True)
 
+
 # --------------------------------
 # RECORD SIMULATOR PID
 # --------------------------------
@@ -35,7 +36,6 @@ print(f"[SIMULATION] PID: {os.getpid()}")
 # --------------------------------
 
 try:
-
     client_socket = socket.socket(
         socket.AF_INET,
         socket.SOCK_STREAM
@@ -51,7 +51,6 @@ try:
     )
 
 except Exception as error:
-
     print(
         f"[SIMULATION] Network connection failed: {error}"
     )
@@ -76,10 +75,9 @@ for honeytoken in HONEYTOKENS:
         f"[SIMULATION] Accessing: {honeytoken}"
     )
 
-    with honeytoken.open("a") as file:
-        file.write(
-            "\nSIMULATED ATTACK ACCESS\n"
-        )
+    # READ ONLY — does NOT modify the honeytoken
+    with honeytoken.open("r") as file:
+        file.read()
 
     time.sleep(2)
 
