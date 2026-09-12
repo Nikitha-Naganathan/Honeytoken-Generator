@@ -1,8 +1,11 @@
 from datetime import datetime, timedelta
+import json
+from pathlib import Path
+from attack_narrator import generate_attack_narrative
 
 
-# Events within this time window can belong to the same attack
 CORRELATION_WINDOW = timedelta(seconds=30)
+LOG_FILE = Path("logs/security_events.json")
 
 
 def correlate_events(events):
@@ -11,7 +14,6 @@ def correlate_events(events):
         return []
 
     attacks = []
-
     current_attack = [events[0]]
 
     for event in events[1:]:
@@ -83,6 +85,57 @@ def summarize_attack(events):
     }
 
 
+def load_events():
+
+    if not LOG_FILE.exists():
+        return []
+
+    try:
+        with LOG_FILE.open("r") as file:
+            return json.load(file)
+
+    except (json.JSONDecodeError, FileNotFoundError):
+        return []
+
+
 if __name__ == "__main__":
 
-    print("[*] Attack correlator module works")
+    print("[*] Loading security events...")
+
+    events = load_events()
+
+    print(f"[*] Events found: {len(events)}")
+
+    attacks = correlate_events(events)
+
+    print(f"[*] Attacks detected: {len(attacks)}")
+
+    for number, attack in enumerate(attacks, start=1):
+
+        summary = summarize_attack(attack)
+
+        print("\n========== ATTACK SUMMARY ==========")
+        print(f"Attack: {number}")
+        print(f"Events: {summary['event_count']}")
+        print(f"Process IDs: {summary['process_ids']}")
+        print(f"Files accessed:")
+
+        for file in summary["files_accessed"]:
+            print(f"    - {file}")
+
+        print(
+            f"Maximum threat score: "
+            f"{summary['maximum_threat_score']}"
+        )
+
+        print(f"Severity: {summary['severity']}")
+        print(
+            f"Start: {summary['attack_start']}"
+        )
+        print(
+            f"End: {summary['attack_end']}"
+        )
+        print("\n---------- THREAT NARRATIVE ----------")
+        print(generate_attack_narrative(summary))
+        print("---------------------------------------")
+        print("=====================================")
