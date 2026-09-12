@@ -82,16 +82,18 @@ async def receive_event(
     # -----------------------------------------------------
 
     new_event = Event(
-        timestamp=event_data.timestamp,
-        event_type=event_data.event_type,
-        file=event_data.file,
-        filesystem_event=event_data.filesystem_event,
-        pid=event_data.pid,
-        process_name=event_data.process_name,
-        username=event_data.username,
-        command=event_data.command,
-        severity=calculated_severity
-    )
+    timestamp=event_data.timestamp,
+    event_type=event_data.event_type,
+    file=event_data.file,
+    filesystem_event=event_data.filesystem_event,
+    pid=event_data.pid,
+    process_name=event_data.process_name,
+    username=event_data.username,
+    command=event_data.command,
+    threat_score=event_data.threat_score,
+    severity=calculated_severity,
+    threat_reasons=event_data.threat_reasons
+)
 
 
     # -----------------------------------------------------
@@ -119,6 +121,8 @@ async def receive_event(
         "username": new_event.username,
         "command": new_event.command,
         "severity": new_event.severity,
+        "threat_score": new_event.threat_score,
+        "threat_reasons": new_event.threat_reasons,
         "allowed": allowed
     }
 
