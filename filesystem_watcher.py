@@ -4,8 +4,8 @@ from pathlib import Path
 from datetime import datetime
 from process_attributor import get_process_info
 from security_event import create_security_event, print_security_event
+from event_logger import log_security_event
 import time
-
 
 HONEYTOKEN_DIR = Path("honeytokens")
 PID_FILE = Path("logs/simulator.pid")
@@ -47,6 +47,8 @@ class HoneytokenHandler(FileSystemEventHandler):
                     )
 
                     print_security_event(security_event)
+
+                    log_security_event(security_event)
 
                 except ValueError:
                     print("[!] Invalid PID file")
