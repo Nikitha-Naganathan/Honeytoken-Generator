@@ -1,37 +1,42 @@
+from pathlib import Path
+
+
+# File types that are especially interesting
+# when accessed by an attacker.
+HIGH_SEVERITY_EXTENSIONS = {
+    ".key",
+    ".pem",
+    ".p12",
+    ".pfx",
+    ".env",
+    ".sql",
+}
+
+HIGH_SEVERITY_NAMES = {
+    "passwords.xlsx",
+    "credentials.txt",
+    "aws_credentials.txt",
+    "secrets.txt",
+    "id_rsa",
+}
+
+
 def calculate_severity(filepath: str) -> str:
-    """
-    Calculate severity based on the type of honeytoken accessed.
-    """
 
-    filepath = filepath.lower()
+    filename = Path(filepath).name.lower()
+    extension = Path(filepath).suffix.lower()
 
-    # High-value credential and secret decoys
-    high_priority = [
-        "password",
-        "credential",
-        "aws",
-        ".env",
-        "secret",
-        "api_key",
-        "apikey",
-        "git-credentials"
-    ]
+    # Very sensitive honeytokens
+    if filename in HIGH_SEVERITY_NAMES:
+        return "high"
 
-    # Medium-value sensitive-looking files
-    medium_priority = [
-        ".xlsx",
-        ".csv",
-        ".json",
-        ".db",
-        ".sqlite"
-    ]
+    # Sensitive credential/key files
+    if extension in HIGH_SEVERITY_EXTENSIONS:
+        return "high"
 
-    for keyword in high_priority:
-        if keyword in filepath:
-            return "high"
+    # Medium-risk files
+    if extension in {".docx", ".xlsx", ".csv", ".pdf"}:
+        return "medium"
 
-    for keyword in medium_priority:
-        if keyword in filepath:
-            return "medium"
-
+    # Everything else
     return "low"

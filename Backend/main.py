@@ -3,12 +3,11 @@ from sqlalchemy.orm import Session
 
 from database import engine, get_db
 from database import Base
-
 from models import Event
 from schemas import EventCreate, EventResponse
-
 from severity import calculate_severity
 from alerts import send_alert
+from allowlist import is_allowed_process
 
 
 # Create database tables
@@ -60,12 +59,28 @@ async def receive_event(
     db: Session = Depends(get_db)
 ):
 
-    # Calculate our own severity based on the honeytoken
+    # -----------------------------------------------------
+    # 1. Calculate severity
+    # -----------------------------------------------------
+
     calculated_severity = calculate_severity(
         event_data.filepath
     )
 
-    # Create database event
+
+    # -----------------------------------------------------
+    # 2. Check allowlist
+    # -----------------------------------------------------
+
+    allowed = is_allowed_process(
+        event_data.process_name
+    )
+
+
+    # -----------------------------------------------------
+    # 3. Create database event
+    # -----------------------------------------------------
+
     new_event = Event(
         timestamp=event_data.timestamp,
         filepath=event_data.filepath,
@@ -75,12 +90,21 @@ async def receive_event(
         severity=calculated_severity
     )
 
-    # Store in SQLite
+
+    # -----------------------------------------------------
+    # 4. Store in SQLite
+    # -----------------------------------------------------
+
     db.add(new_event)
     db.commit()
     db.refresh(new_event)
 
-    # Convert event into dictionary for WebSocket
+
+    # -----------------------------------------------------
+    # 5. Convert event into dictionary
+    #    for WebSocket clients
+    # -----------------------------------------------------
+
     event_json = {
         "id": new_event.id,
         "timestamp": new_event.timestamp,
@@ -88,14 +112,37 @@ async def receive_event(
         "event_type": new_event.event_type,
         "process_name": new_event.process_name,
         "pid": new_event.pid,
-        "severity": new_event.severity
+        "severity": new_event.severity,
+        "allowed": allowed
     }
 
-    # Broadcast to dashboard clients
+
+    # -----------------------------------------------------
+    # 6. Broadcast event to dashboard
+    # -----------------------------------------------------
+
     await broadcast_event(event_json)
 
-    # Send external alert
-    send_alert(new_event)
+
+    # -----------------------------------------------------
+    # 7. Send Discord alert only if process is NOT allowed
+    # -----------------------------------------------------
+
+    if not allowed:
+
+        send_alert(new_event)
+
+    else:
+
+        print(
+            f"ℹ️ Allowed process detected: "
+            f"{new_event.process_name}"
+        )
+
+
+    # -----------------------------------------------------
+    # 8. Return event to API caller
+    # -----------------------------------------------------
 
     return new_event
 
@@ -123,7 +170,9 @@ def get_events(
 # ---------------------------------------------------------
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket
+):
 
     await websocket.accept()
 
@@ -144,6 +193,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
 
         if websocket in connected_clients:
+
             connected_clients.remove(websocket)
 
         print(
@@ -160,6 +210,7 @@ async def broadcast_event(event):
 
     disconnected_clients = []
 
+
     for websocket in connected_clients:
 
         try:
@@ -170,8 +221,10 @@ async def broadcast_event(event):
 
             disconnected_clients.append(websocket)
 
+
     # Remove dead connections
     for websocket in disconnected_clients:
 
         if websocket in connected_clients:
+
             connected_clients.remove(websocket)
