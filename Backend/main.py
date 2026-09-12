@@ -1,15 +1,18 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.orm import Session
 
 from database import engine, get_db
 from database import Base
+
 from models import Event
 from schemas import EventCreate, EventResponse
+
 from severity import calculate_severity
 from alerts import send_alert
 from allowlist import is_allowed_process
 
 from ip_geolocation import get_ip_location
+
 from blocked_ips import (
     block_ip,
     unblock_ip,
@@ -18,11 +21,17 @@ from blocked_ips import (
 )
 
 
-# Create database tables
+# =========================================================
+# DATABASE
+# =========================================================
+
 Base.metadata.create_all(bind=engine)
 
 
-# Create FastAPI application
+# =========================================================
+# FASTAPI APPLICATION
+# =========================================================
+
 app = FastAPI(
     title="Honeytoken Backend",
     description="Backend for the Deception-Based Endpoint Defense system",
@@ -30,13 +39,16 @@ app = FastAPI(
 )
 
 
-# Connected WebSocket clients
+# =========================================================
+# CONNECTED WEBSOCKET CLIENTS
+# =========================================================
+
 connected_clients = []
 
 
-# ---------------------------------------------------------
+# =========================================================
 # HOME
-# ---------------------------------------------------------
+# =========================================================
 
 @app.get("/")
 def home():
@@ -46,9 +58,9 @@ def home():
     }
 
 
-# ---------------------------------------------------------
+# =========================================================
 # HEALTH CHECK
-# ---------------------------------------------------------
+# =========================================================
 
 @app.get("/health")
 def health():
@@ -57,19 +69,18 @@ def health():
     }
 
 
-# ---------------------------------------------------------
+# =========================================================
 # POST EVENT
-# ---------------------------------------------------------
+# =========================================================
 
 @app.post("/events", response_model=EventResponse)
 async def receive_event(
     event_data: EventCreate,
-    request: Request,
     db: Session = Depends(get_db)
 ):
 
     # -----------------------------------------------------
-    # 1. Calculate severity
+    # 1. CALCULATE SEVERITY
     # -----------------------------------------------------
 
     calculated_severity = calculate_severity(
@@ -78,7 +89,7 @@ async def receive_event(
 
 
     # -----------------------------------------------------
-    # 2. Check allowlist
+    # 2. CHECK ALLOWLIST
     # -----------------------------------------------------
 
     allowed = is_allowed_process(
@@ -87,22 +98,32 @@ async def receive_event(
 
 
     # -----------------------------------------------------
-    # 3. Identify source IP
+    # 3. NETWORK ATTRIBUTION
+    # -----------------------------------------------------
+    #
+    # IMPORTANT:
+    #
+    # Person A identifies the source of the suspicious
+    # activity and sends it with the event.
+    #
+    # We therefore DO NOT use request.client.host here.
+    #
     # -----------------------------------------------------
 
-    source_ip = (
-        request.client.host
-        if request.client
-        else None
-    )
+    source_ip = event_data.source_ip
+    source_port = event_data.source_port
+    mac_address = event_data.mac_address
+    subnet = event_data.subnet
+    network_type = event_data.network_type
 
 
     # -----------------------------------------------------
-    # 4. IP geolocation
+    # 4. IP GEOLOCATION
     # -----------------------------------------------------
 
     if source_ip:
         location = get_ip_location(source_ip)
+
     else:
         location = {
             "country": "Unknown",
@@ -112,25 +133,30 @@ async def receive_event(
 
 
     # -----------------------------------------------------
-    # 5. Determine initial containment state
+    # 5. INITIAL CONTAINMENT STATE
     # -----------------------------------------------------
 
     containment_status = "monitoring"
+
     process_terminated = "not_required"
+
     ip_blocked = "not_required"
 
 
-    # High-confidence event
+    # -----------------------------------------------------
+    # 6. HIGH-CONFIDENCE THREAT RESPONSE
+    # -----------------------------------------------------
+
     if event_data.threat_score >= 80 and not allowed:
 
         containment_status = "contained"
 
-        # B records that endpoint process termination
-        # should happen.
+        # Tell the endpoint agent that the suspicious
+        # process should be terminated.
         process_terminated = "requested"
 
-
-        # Block the source IP when available
+        # Block the attributed source IP in the
+        # backend's central response state.
         if source_ip:
 
             block_ip(source_ip)
@@ -139,7 +165,7 @@ async def receive_event(
 
 
     # -----------------------------------------------------
-    # 6. Create database event
+    # 7. CREATE DATABASE EVENT
     # -----------------------------------------------------
 
     new_event = Event(
@@ -166,14 +192,25 @@ async def receive_event(
 
         threat_reasons=event_data.threat_reasons,
 
+        # Network attribution
         source_ip=source_ip,
 
+        source_port=source_port,
+
+        mac_address=mac_address,
+
+        subnet=subnet,
+
+        network_type=network_type,
+
+        # Geolocation
         country=location["country"],
 
         region=location["region"],
 
         city=location["city"],
 
+        # Response
         containment_status=containment_status,
 
         process_terminated=process_terminated,
@@ -183,7 +220,7 @@ async def receive_event(
 
 
     # -----------------------------------------------------
-    # 7. Store in SQLite
+    # 8. STORE IN SQLITE
     # -----------------------------------------------------
 
     db.add(new_event)
@@ -194,8 +231,7 @@ async def receive_event(
 
 
     # -----------------------------------------------------
-    # 8. Convert event into dictionary
-    #    for WebSocket clients
+    # 9. CREATE WEBSOCKET EVENT
     # -----------------------------------------------------
 
     event_json = {
@@ -226,8 +262,23 @@ async def receive_event(
 
         "allowed": allowed,
 
-        # Source information
+        # -------------------------------------------------
+        # NETWORK INFORMATION
+        # -------------------------------------------------
+
         "source_ip": new_event.source_ip,
+
+        "source_port": new_event.source_port,
+
+        "mac_address": new_event.mac_address,
+
+        "subnet": new_event.subnet,
+
+        "network_type": new_event.network_type,
+
+        # -------------------------------------------------
+        # GEOLOCATION
+        # -------------------------------------------------
 
         "country": new_event.country,
 
@@ -235,24 +286,32 @@ async def receive_event(
 
         "city": new_event.city,
 
-        # Response information
-        "containment_status": new_event.containment_status,
+        # -------------------------------------------------
+        # RESPONSE
+        # -------------------------------------------------
 
-        "process_terminated": new_event.process_terminated,
+        "containment_status":
+            new_event.containment_status,
 
-        "ip_blocked": new_event.ip_blocked
+        "process_terminated":
+            new_event.process_terminated,
+
+        "ip_blocked":
+            new_event.ip_blocked
     }
 
 
     # -----------------------------------------------------
-    # 9. Broadcast event to dashboard
+    # 10. BROADCAST TO DASHBOARD
     # -----------------------------------------------------
 
-    await broadcast_event(event_json)
+    await broadcast_event(
+        event_json
+    )
 
 
     # -----------------------------------------------------
-    # 10. Send Discord alert
+    # 11. DISCORD ALERT
     # -----------------------------------------------------
 
     if not allowed:
@@ -268,15 +327,33 @@ async def receive_event(
 
 
     # -----------------------------------------------------
-    # 11. Print containment information
+    # 12. PRINT CONTAINMENT INFORMATION
     # -----------------------------------------------------
 
     if containment_status == "contained":
 
-        print("\n========== CONTAINMENT ==========")
+        print(
+            "\n========== CONTAINMENT =========="
+        )
 
         print(
             f"Source IP: {source_ip}"
+        )
+
+        print(
+            f"Source Port: {source_port}"
+        )
+
+        print(
+            f"MAC Address: {mac_address}"
+        )
+
+        print(
+            f"Subnet: {subnet}"
+        )
+
+        print(
+            f"Network Type: {network_type}"
         )
 
         print(
@@ -311,19 +388,21 @@ async def receive_event(
             f"{containment_status}"
         )
 
-        print("=================================\n")
+        print(
+            "=================================\n"
+        )
 
 
     # -----------------------------------------------------
-    # 12. Return event
+    # 13. RETURN EVENT
     # -----------------------------------------------------
 
     return new_event
 
 
-# ---------------------------------------------------------
+# =========================================================
 # GET ALL EVENTS
-# ---------------------------------------------------------
+# =========================================================
 
 @app.get("/events")
 def get_events(
@@ -339,9 +418,9 @@ def get_events(
     return events
 
 
-# ---------------------------------------------------------
+# =========================================================
 # BLOCK IP
-# ---------------------------------------------------------
+# =========================================================
 
 @app.post("/block-ip/{ip}")
 async def block_ip_endpoint(
@@ -363,9 +442,9 @@ async def block_ip_endpoint(
     return result
 
 
-# ---------------------------------------------------------
+# =========================================================
 # UNBLOCK IP
-# ---------------------------------------------------------
+# =========================================================
 
 @app.post("/unblock-ip/{ip}")
 async def unblock_ip_endpoint(
@@ -387,9 +466,9 @@ async def unblock_ip_endpoint(
     return result
 
 
-# ---------------------------------------------------------
-# GET BLOCKED IPs
-# ---------------------------------------------------------
+# =========================================================
+# GET BLOCKED IPS
+# =========================================================
 
 @app.get("/blocked-ips")
 def get_blocked():
@@ -399,9 +478,9 @@ def get_blocked():
     }
 
 
-# ---------------------------------------------------------
+# =========================================================
 # CHECK IP
-# ---------------------------------------------------------
+# =========================================================
 
 @app.get("/check-ip/{ip}")
 def check_ip(ip: str):
@@ -412,9 +491,9 @@ def check_ip(ip: str):
     }
 
 
-# ---------------------------------------------------------
+# =========================================================
 # ISOLATE EVENT
-# ---------------------------------------------------------
+# =========================================================
 
 @app.post("/isolate/{event_id}")
 async def isolate_event(
@@ -436,12 +515,18 @@ async def isolate_event(
         }
 
 
+    # Update containment state
+
     event.containment_status = "isolated"
 
 
+    # Block source IP if available
+
     if event.source_ip:
 
-        block_ip(event.source_ip)
+        block_ip(
+            event.source_ip
+        )
 
         event.ip_blocked = "blocked"
 
@@ -450,6 +535,10 @@ async def isolate_event(
 
     db.refresh(event)
 
+
+    # -----------------------------------------------------
+    # BROADCAST CONTAINMENT UPDATE
+    # -----------------------------------------------------
 
     isolation_message = {
 
@@ -476,9 +565,9 @@ async def isolate_event(
     return isolation_message
 
 
-# ---------------------------------------------------------
+# =========================================================
 # WEBSOCKET
-# ---------------------------------------------------------
+# =========================================================
 
 @app.websocket("/ws")
 async def websocket_endpoint(
@@ -502,6 +591,7 @@ async def websocket_endpoint(
         while True:
 
             # Keep connection alive
+
             await websocket.receive_text()
 
 
@@ -513,15 +603,16 @@ async def websocket_endpoint(
                 websocket
             )
 
+
         print(
             f"WebSocket client disconnected. "
             f"Total clients: {len(connected_clients)}"
         )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # BROADCAST FUNCTION
-# ---------------------------------------------------------
+# =========================================================
 
 async def broadcast_event(event):
 
@@ -543,7 +634,7 @@ async def broadcast_event(event):
             )
 
 
-    # Remove dead connections
+    # Remove disconnected clients
 
     for websocket in disconnected_clients:
 
