@@ -41,16 +41,16 @@ def trigger_honeytoken():
     Controlled demo action.
 
     The network request causes the demo server
-    to access a fake credential file.
+    to ACCESS a fake credential file.
+
+    The honeytoken itself is not modified.
     """
 
     print("\n========== HONEYTOKEN ACTION ==========")
     print(f"Accessing: {HONEYTOKEN}")
 
-    with HONEYTOKEN.open("a") as file:
-        file.write(
-            "\nCONTROLLED NETWORK DEMO ACCESS\n"
-        )
+    with HONEYTOKEN.open("r") as file:
+        file.read()
 
     print("[+] Honeytoken accessed.")
     print("=======================================")
@@ -88,9 +88,13 @@ while True:
 
     if data:
 
-        message = data.decode(errors="ignore").strip()
+        message = data.decode(
+            errors="ignore"
+        ).strip()
 
-        print(f"Data received: {message}")
+        print(
+            f"Data received: {message}"
+        )
 
         if message == "HELLO HONEYTRACE":
 
