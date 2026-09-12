@@ -1,62 +1,35 @@
 import socket
+import json
 from pathlib import Path
 from datetime import datetime
-import json
 
 
 HOST = "0.0.0.0"
 PORT = 9999
 
-HONEYTOKEN = Path("honeytokens/passwords.txt")
-
-NETWORK_CONTEXT_FILE = Path("logs/network_context.json")
-
-NETWORK_CONTEXT_FILE.parent.mkdir(exist_ok=True)
+HONEYTOKEN = Path("honeytokens/passwords.txt").resolve()
+NETWORK_CONTEXT_FILE = Path("logs/network_context.json").resolve()
+ACCESS_EVENT_FILE = Path("logs/honeytoken_access.json").resolve()
 
 
-def save_network_context(source_ip, source_port):
-    """
-    Save the most recent network request so that
-    HoneyTrace can correlate it with the honeytoken event.
-    """
-
-    context = {
-        "timestamp": datetime.now().isoformat(),
-        "source_ip": source_ip,
-        "source_port": source_port
-    }
-
-    with NETWORK_CONTEXT_FILE.open("w") as file:
-        json.dump(context, file, indent=4)
-
-    print("\n========== NETWORK CONTEXT ==========")
-    print(f"Source IP: {source_ip}")
-    print(f"Source Port: {source_port}")
-    print(f"Saved to: {NETWORK_CONTEXT_FILE}")
-    print("=====================================")
+# Make sure required directories exist
+HONEYTOKEN.parent.mkdir(parents=True, exist_ok=True)
+NETWORK_CONTEXT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
-def trigger_honeytoken():
-    """
-    Controlled demo action.
-
-    The network request causes the demo server
-    to ACCESS a fake credential file.
-
-    The honeytoken itself is not modified.
-    """
-
-    print("\n========== HONEYTOKEN ACTION ==========")
-    print(f"Accessing: {HONEYTOKEN}")
-
-    with HONEYTOKEN.open("r") as file:
-        file.read()
-
-    print("[+] Honeytoken accessed.")
-    print("=======================================")
+# Create fake honeytoken if it doesn't exist
+if not HONEYTOKEN.exists():
+    HONEYTOKEN.write_text(
+        "HoneyTrace fake credential file\n"
+        "This file contains no real credentials.\n",
+        encoding="utf-8"
+    )
 
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server = socket.socket(
+    socket.AF_INET,
+    socket.SOCK_STREAM
+)
 
 server.setsockopt(
     socket.SOL_SOCKET,
@@ -67,8 +40,10 @@ server.setsockopt(
 server.bind((HOST, PORT))
 server.listen(5)
 
+
 print("[*] HoneyTrace demo server started")
 print(f"[*] Listening on port {PORT}")
+print(f"[*] Honeytoken: {HONEYTOKEN}")
 print("[*] Waiting for System B...")
 
 
@@ -86,33 +61,93 @@ while True:
 
     data = client.recv(1024)
 
-    if data:
+    message = data.decode(
+        errors="ignore"
+    ).strip()
 
-        message = data.decode(
-            errors="ignore"
-        ).strip()
+    print(f"Data received: {message}")
+
+    # --------------------------------------------------
+    # Record network context
+    # --------------------------------------------------
+
+    network_context = {
+        "timestamp": datetime.now().isoformat(),
+        "source_ip": source_ip,
+        "source_port": source_port
+    }
+
+    NETWORK_CONTEXT_FILE.write_text(
+        json.dumps(
+            network_context,
+            indent=4
+        ),
+        encoding="utf-8"
+    )
+
+    # --------------------------------------------------
+    # Controlled honeytoken access
+    # --------------------------------------------------
+
+    if message == "HELLO HONEYTRACE":
 
         print(
-            f"Data received: {message}"
+            "\n[!] Simulated suspicious request detected"
         )
 
-        if message == "HELLO HONEYTRACE":
+        print(
+            f"[!] Accessing fake honeytoken: "
+            f"{HONEYTOKEN}"
+        )
 
-            save_network_context(
-                source_ip,
-                source_port
-            )
+        # Read ONLY the fake honeytoken
+        fake_data = HONEYTOKEN.read_text(
+            encoding="utf-8"
+        )
 
-            trigger_honeytoken()
+        print(
+            "[!] Fake honeytoken accessed."
+        )
 
-            client.sendall(
-                b"HoneyTrace detected and logged the request\n"
-            )
+        # --------------------------------------------------
+        # Create explicit HoneyTrace access event
+        # --------------------------------------------------
 
-        else:
+        access_event = {
+            "timestamp": datetime.now().isoformat(),
+            "event_type": "honeytoken_access",
+            "file": str(HONEYTOKEN),
+            "filesystem_event": "read",
+            "source_ip": source_ip,
+            "source_port": source_port,
+            "process_name": "demo_server.py",
+            "message": message
+        }
 
-            client.sendall(
-                b"Unknown request\n"
-            )
+        ACCESS_EVENT_FILE.write_text(
+            json.dumps(
+                access_event,
+                indent=4
+            ),
+            encoding="utf-8"
+        )
+
+        print(
+            "[+] HoneyTrace access event recorded."
+        )
+
+        response = (
+            b"HoneyTrace detected and logged "
+            b"the request\n"
+        )
+
+    else:
+
+        response = (
+            b"HoneyTrace demo server received "
+            b"request\n"
+        )
+
+    client.sendall(response)
 
     client.close()
