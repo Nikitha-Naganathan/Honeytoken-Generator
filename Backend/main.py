@@ -1,0 +1,177 @@
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
+from sqlalchemy.orm import Session
+
+from database import engine, get_db
+from database import Base
+
+from models import Event
+from schemas import EventCreate, EventResponse
+
+from severity import calculate_severity
+from alerts import send_alert
+
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+
+# Create FastAPI application
+app = FastAPI(
+    title="Honeytoken Backend",
+    description="Backend for the Deception-Based Endpoint Defense system",
+    version="1.0.0"
+)
+
+
+# Connected WebSocket clients
+connected_clients = []
+
+
+# ---------------------------------------------------------
+# HOME
+# ---------------------------------------------------------
+
+@app.get("/")
+def home():
+    return {
+        "message": "Honeytoken Backend is running!",
+        "status": "online"
+    }
+
+
+# ---------------------------------------------------------
+# HEALTH CHECK
+# ---------------------------------------------------------
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy"
+    }
+
+
+# ---------------------------------------------------------
+# POST EVENT
+# ---------------------------------------------------------
+
+@app.post("/events", response_model=EventResponse)
+async def receive_event(
+    event_data: EventCreate,
+    db: Session = Depends(get_db)
+):
+
+    # Calculate our own severity based on the honeytoken
+    calculated_severity = calculate_severity(
+        event_data.filepath
+    )
+
+    # Create database event
+    new_event = Event(
+        timestamp=event_data.timestamp,
+        filepath=event_data.filepath,
+        event_type=event_data.event_type,
+        process_name=event_data.process_name,
+        pid=event_data.pid,
+        severity=calculated_severity
+    )
+
+    # Store in SQLite
+    db.add(new_event)
+    db.commit()
+    db.refresh(new_event)
+
+    # Convert event into dictionary for WebSocket
+    event_json = {
+        "id": new_event.id,
+        "timestamp": new_event.timestamp,
+        "filepath": new_event.filepath,
+        "event_type": new_event.event_type,
+        "process_name": new_event.process_name,
+        "pid": new_event.pid,
+        "severity": new_event.severity
+    }
+
+    # Broadcast to dashboard clients
+    await broadcast_event(event_json)
+
+    # Send external alert
+    send_alert(new_event)
+
+    return new_event
+
+
+# ---------------------------------------------------------
+# GET ALL EVENTS
+# ---------------------------------------------------------
+
+@app.get("/events")
+def get_events(
+    db: Session = Depends(get_db)
+):
+
+    events = (
+        db.query(Event)
+        .order_by(Event.id.desc())
+        .all()
+    )
+
+    return events
+
+
+# ---------------------------------------------------------
+# WEBSOCKET
+# ---------------------------------------------------------
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+
+    await websocket.accept()
+
+    connected_clients.append(websocket)
+
+    print(
+        f"WebSocket client connected. "
+        f"Total clients: {len(connected_clients)}"
+    )
+
+    try:
+
+        while True:
+
+            # Keep connection alive
+            await websocket.receive_text()
+
+    except WebSocketDisconnect:
+
+        if websocket in connected_clients:
+            connected_clients.remove(websocket)
+
+        print(
+            f"WebSocket client disconnected. "
+            f"Total clients: {len(connected_clients)}"
+        )
+
+
+# ---------------------------------------------------------
+# BROADCAST FUNCTION
+# ---------------------------------------------------------
+
+async def broadcast_event(event):
+
+    disconnected_clients = []
+
+    for websocket in connected_clients:
+
+        try:
+
+            await websocket.send_json(event)
+
+        except Exception:
+
+            disconnected_clients.append(websocket)
+
+    # Remove dead connections
+    for websocket in disconnected_clients:
+
+        if websocket in connected_clients:
+            connected_clients.remove(websocket)
