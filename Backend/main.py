@@ -64,7 +64,7 @@ async def receive_event(
     # -----------------------------------------------------
 
     calculated_severity = calculate_severity(
-        event_data.filepath
+        event_data.file
     )
 
 
@@ -83,10 +83,13 @@ async def receive_event(
 
     new_event = Event(
         timestamp=event_data.timestamp,
-        filepath=event_data.filepath,
         event_type=event_data.event_type,
-        process_name=event_data.process_name,
+        file=event_data.file,
+        filesystem_event=event_data.filesystem_event,
         pid=event_data.pid,
+        process_name=event_data.process_name,
+        username=event_data.username,
+        command=event_data.command,
         severity=calculated_severity
     )
 
@@ -108,10 +111,13 @@ async def receive_event(
     event_json = {
         "id": new_event.id,
         "timestamp": new_event.timestamp,
-        "filepath": new_event.filepath,
         "event_type": new_event.event_type,
-        "process_name": new_event.process_name,
+        "file": new_event.file,
+        "filesystem_event": new_event.filesystem_event,
         "pid": new_event.pid,
+        "process_name": new_event.process_name,
+        "username": new_event.username,
+        "command": new_event.command,
         "severity": new_event.severity,
         "allowed": allowed
     }
@@ -125,17 +131,14 @@ async def receive_event(
 
 
     # -----------------------------------------------------
-    # 7. Send Discord alert only if process is NOT allowed
+    # 7. Send Discord alert if process is NOT allowed
     # -----------------------------------------------------
 
     if not allowed:
-
         send_alert(new_event)
-
     else:
-
         print(
-            f"ℹ️ Allowed process detected: "
+            f"Allowed process detected: "
             f"{new_event.process_name}"
         )
 
@@ -193,7 +196,6 @@ async def websocket_endpoint(
     except WebSocketDisconnect:
 
         if websocket in connected_clients:
-
             connected_clients.remove(websocket)
 
         print(
@@ -210,7 +212,6 @@ async def broadcast_event(event):
 
     disconnected_clients = []
 
-
     for websocket in connected_clients:
 
         try:
@@ -226,5 +227,4 @@ async def broadcast_event(event):
     for websocket in disconnected_clients:
 
         if websocket in connected_clients:
-
             connected_clients.remove(websocket)

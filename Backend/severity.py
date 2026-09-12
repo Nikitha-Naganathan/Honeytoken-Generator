@@ -13,6 +13,9 @@ HIGH_SEVERITY_EXTENSIONS = {
 }
 
 HIGH_SEVERITY_NAMES = {
+    "passwords.txt",
+    "api_keys.txt",
+    "database_credentials.txt",
     "passwords.xlsx",
     "credentials.txt",
     "aws_credentials.txt",

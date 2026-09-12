@@ -18,7 +18,7 @@ def send_alert(event):
     message = {
         "content": (
             "🚨 **HONEYTRAP ALERT** 🚨\n\n"
-            f"**File:** `{event.filepath}`\n"
+            f"**File:** `{event.file}`\n"
             f"**Event:** `{event.event_type}`\n"
             f"**Process:** `{event.process_name}`\n"
             f"**PID:** `{event.pid}`\n"
