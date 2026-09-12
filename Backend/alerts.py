@@ -17,7 +17,7 @@ def send_alert(event):
 
     message = {
         "content": (
-            "🚨 **HONEYPOT ALERT** 🚨\n\n"
+            "🚨 **HONEYTRAP ALERT** 🚨\n\n"
             f"**File:** `{event.filepath}`\n"
             f"**Event:** `{event.event_type}`\n"
             f"**Process:** `{event.process_name}`\n"
