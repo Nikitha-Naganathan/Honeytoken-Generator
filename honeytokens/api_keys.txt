@@ -1,0 +1,3 @@
+API Credentials
+Service: DemoCloud
+API Key: HONEY-FAKE-123456
