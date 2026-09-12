@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Honeytoken WebSocket Test</title>
+</head>
+
+<body>
+
+    <h1>🔌 Honeytoken WebSocket Test</h1>
+
+    <p id="status">Connecting...</p>
+
+    <h2>Incoming Events:</h2>
+
+    <pre id="events"></pre>
+
+    <script>
+
+        const status = document.getElementById("status");
+        const events = document.getElementById("events");
+
+        const socket = new WebSocket(
+            "ws://127.0.0.1:8000/ws"
+        );
+
+        socket.onopen = function () {
+            status.innerText = "🟢 Connected to backend";
+            console.log("WebSocket connected");
+        };
+
+        socket.onmessage = function (event) {
+
+            console.log("New event:", event.data);
+
+            const data = JSON.parse(event.data);
+
+            events.innerText +=
+                JSON.stringify(data, null, 2) +
+                "\n\n";
+        };
+
+        socket.onclose = function () {
+            status.innerText =
+                "🔴 Disconnected from backend";
+        };
+
+        socket.onerror = function (error) {
+            status.innerText =
+                "⚠️ WebSocket error";
+
+            console.error(error);
+        };
+
+    </script>
+
+</body>
+
+</html>
