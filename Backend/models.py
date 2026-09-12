@@ -20,3 +20,12 @@ class Event(Base):
     threat_score = Column(Integer, nullable=False)
     severity = Column(String, nullable=False)
     threat_reasons = Column(JSON, nullable=False)
+
+    source_ip = Column(String, nullable=True)
+    country = Column(String, nullable=True)
+    region = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+
+    containment_status = Column(String, default="detected")
+    process_terminated = Column(String, default="pending")
+    ip_blocked = Column(String, default="pending")
