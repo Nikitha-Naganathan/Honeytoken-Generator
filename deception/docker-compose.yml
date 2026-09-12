@@ -1,0 +1,26 @@
+services:
+  decoy:
+    build:
+      context: ./decoy
+    container_name: honeytrace-decoy
+    networks:
+      - honeytrace-net
+    volumes:
+      - ./decoy:/decoy
+    command: ["python", "-m", "http.server", "8080", "--directory", "/decoy"]
+    ports:
+      - "8080:8080"
+
+  attacker:
+    build:
+      context: ./attacker
+    container_name: honeytrace-attacker
+    networks:
+      - honeytrace-net
+    depends_on:
+      - decoy
+    command: ["python", "attacker.py"]
+
+networks:
+  honeytrace-net:
+    driver: bridge

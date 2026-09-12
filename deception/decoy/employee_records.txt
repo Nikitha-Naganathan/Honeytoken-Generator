@@ -1,0 +1,16 @@
+HONEYTRACE DECOY DATA
+=====================
+
+This file contains fictional employee records
+created exclusively for the HoneyTrace demonstration.
+
+Employee ID: DEMO-001
+Name: Demo User
+Department: Security Lab
+
+Employee ID: DEMO-002
+Name: Test Account
+Department: Engineering
+
+WARNING:
+This is fictional data for a cybersecurity demonstration.
