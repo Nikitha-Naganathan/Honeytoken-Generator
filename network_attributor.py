@@ -1,5 +1,7 @@
 import psutil
 
+from ip_geolocation import get_ip_location
+
 
 def get_network_connections(pid):
     """
@@ -63,20 +65,56 @@ def get_remote_ips(pid):
     return remote_ips
 
 
+def get_network_locations(pid):
+    """
+    Get approximate geographic locations
+    for remote IP addresses associated with a process.
+    """
+
+    remote_ips = get_remote_ips(pid)
+
+    locations = []
+
+    for ip in remote_ips:
+
+        location = get_ip_location(ip)
+
+        locations.append(location)
+
+    return locations
+
+
 if __name__ == "__main__":
 
     import os
 
     current_pid = os.getpid()
 
-    print(f"[*] Checking network connections for PID {current_pid}")
+    print(
+        f"[*] Checking network connections "
+        f"for PID {current_pid}"
+    )
 
     connections = get_network_connections(current_pid)
 
     if not connections:
+
         print("[*] No network connections found.")
 
     else:
 
         for connection in connections:
             print(connection)
+
+    print("\n[*] Checking IP geolocation...")
+
+    locations = get_network_locations(current_pid)
+
+    if not locations:
+
+        print("[*] No remote IP locations found.")
+
+    else:
+
+        for location in locations:
+            print(location)
