@@ -1,0 +1,155 @@
+/* ==========================================================================
+   HONEYTRAP SOC DASHBOARD — THEME & DESIGN TOKENS
+   STRICT 4-COLOR BASE PALETTE (ZERO FOREIGN HUES):
+   - #2C2C2C : Deep Charcoal Base / Background
+   - #853953 : Primary Accent / Critical & High Severity / Trendline / Primary CTA
+   - #612D53 : Secondary Accent / Medium & Low Severity / Containers / Headers
+   - #F3F4F4 : High-Contrast Foreground / Text / Numbers / Active Glyphs
+   ========================================================================== */
+
+:root {
+  /* Core 4-Color Tokens */
+  --color-base: #2C2C2C;
+  --color-primary-accent: #853953;
+  --color-secondary-accent: #612D53;
+  --color-foreground: #F3F4F4;
+
+  /* Severity Hierarchy (Strictly derived via shade/opacity of #853953 and #612D53) */
+  --sev-critical-bg: #853953;
+  --sev-critical-text: #F3F4F4;
+  --sev-critical-border: #853953;
+
+  --sev-high-bg: rgba(133, 57, 83, 0.60);
+  --sev-high-text: #F3F4F4;
+  --sev-high-border: rgba(133, 57, 83, 0.60);
+
+  --sev-medium-bg: #612D53;
+  --sev-medium-text: #F3F4F4;
+  --sev-medium-border: #612D53;
+
+  --sev-low-bg: rgba(97, 45, 83, 0.50);
+  --sev-low-text: rgba(243, 244, 244, 0.85);
+  --sev-low-border: rgba(97, 45, 83, 0.50);
+
+  /* Surface Depths */
+  --surface-base: #2C2C2C;
+  --surface-panel: rgba(243, 244, 244, 0.03);
+  --surface-panel-hover: rgba(243, 244, 244, 0.05);
+  --surface-elevated: rgba(243, 244, 244, 0.06);
+  --surface-sidebar: #242424;
+  --surface-header: #282828;
+
+  /* Borders & Dividers */
+  --border-subtle: 1px solid rgba(243, 244, 244, 0.08);
+  --border-medium: 1px solid rgba(243, 244, 244, 0.16);
+  --border-accent: 1px solid #853953;
+  --border-secondary: 1px solid #612D53;
+
+  /* Typography System */
+  --font-ui: 'Barlow', 'DIN 2014', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', Menlo, Consolas, monospace;
+  
+  --text-size-xs: 11px;
+  --text-size-sm: 12px;
+  --text-size-base: 14px; /* Minimum 14px for body copy to prevent analyst eye fatigue */
+  --text-size-md: 15px;
+  --text-size-lg: 18px;
+  --text-size-xl: 22px;
+  --text-size-2xl: 28px;
+  --text-size-stat: 46px;
+
+  /* Transitions & Radii (Sharp Industrial Feel) */
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --transition-fast: 120ms cubic-bezier(0.2, 0, 0, 1);
+  --transition-normal: 200ms cubic-bezier(0.2, 0, 0, 1);
+
+  /* Elevation Shadows */
+  --shadow-elevation: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.65);
+  --shadow-toast: 0 10px 30px rgba(0, 0, 0, 0.70);
+}
+
+/* Reset and Global Base Setup */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-base);
+  color: var(--color-foreground);
+  font-family: var(--font-ui);
+  font-size: var(--text-size-base);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* Strict Monospace Telemetry Elements */
+.font-mono, 
+code, 
+pre, 
+.telemetry-val, 
+.ip-address, 
+.timestamp, 
+.process-path, 
+.hash-val, 
+.mac-address, 
+.pid-val, 
+.port-val,
+.vlan-val,
+.coord-val {
+  font-family: var(--font-mono) !important;
+  letter-spacing: -0.02em;
+}
+
+/* Industrial Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-secondary-accent);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-accent);
+}
+
+/* Interactive Elements Base */
+button {
+  font-family: var(--font-ui);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select, textarea {
+  font-family: var(--font-ui);
+  color: var(--color-foreground);
+  background: var(--surface-panel);
+  border: var(--border-subtle);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-accent);
+  background: var(--surface-elevated);
+}
+
+a {
+  color: var(--color-foreground);
+  text-decoration: none;
+}
